@@ -155,7 +155,8 @@ export class MP4MuxProcessor extends Processor {
     } else if (p.defaultPayloadInfo.isVideo()) {
 
       if (this.options_.fragmentedMode && p.defaultPayloadInfo.isBitstreamHeader) {
-        this.handleSymbolicPacket_(PacketSymbol.EOS);
+        //this._close();
+        //this._flush();
       }
 
       this.videoPacketQueue_.push(p);
@@ -187,16 +188,23 @@ export class MP4MuxProcessor extends Processor {
   protected handleSymbolicPacket_ (symbol: PacketSymbol): boolean {
     switch (symbol) {
     case PacketSymbol.RESUME:
+      if (this.mp4Muxer_) {
+        warn('RESUME received but state already closed');
+        break;
+      }
       log('resume symbol received, closing state');
       this._close();
       break;
     case PacketSymbol.EOS:
+      if (!this.mp4Muxer_) {
+        warn('EOS received but state not closed');
+        break;
+      }
       log('EOS received');
       this.flushCounter_++;
       if (this.flushCounter_ !== this.in.length) {
         break;
       }
-
       log('received EOS symbols count equal to inputs width, flushing');
       this.flushCounter_ = 0;
       this._flush();
@@ -366,9 +374,9 @@ export class MP4MuxProcessor extends Processor {
     mp4Muxer.ondata = this.onMp4MuxerData_.bind(this);
     mp4Muxer.oncodecinfo = this.onMp4MuxerCodecInfo_.bind(this);
 
-    if (!this.options_.fragmentedMode) {
+    //if (!this.options_.fragmentedMode) {
       this.hasBeenClosed_ = true;
-    }
+    //}
   }
 
   private _getNextTrackId (): number {
@@ -376,10 +384,16 @@ export class MP4MuxProcessor extends Processor {
   }
 
   private _close () {
+    if (this.mp4Metadata_.tracks.length === 0) return;
+
     log('closing state');
     if (!this.hasBeenClosed_) {
       this._initMuxer();
     }
+  }
+
+  private _flush () {
+    if (this.mp4Metadata_.tracks.length === 0) return;
 
     log('processing video packet queue', this.videoPacketQueue_);
 
@@ -392,11 +406,7 @@ export class MP4MuxProcessor extends Processor {
       this._processAudioPacket(packet);
     });
     this.audioPacketQueue_ = [];
-  }
 
-  private _flush () {
-    log('flush called');
-    this._close();
     log('will flush internal muxer engine');
     this.mp4Muxer_.flush();
   }

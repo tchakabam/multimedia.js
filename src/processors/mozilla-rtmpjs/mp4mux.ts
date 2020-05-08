@@ -958,7 +958,7 @@ export class MP4Mux {
         trafs.push(traf);
       }
 
-      this.cachedPackets.splice(0, cachedPackets.length);
+      this.cachedPackets = []
 
       let moofHeader = new MovieFragmentHeaderBox(++this.chunkIndex);
       let moof = new MovieFragmentBox(moofHeader, trafs);
